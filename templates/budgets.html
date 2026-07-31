@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -21,6 +21,7 @@ body{
   background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased;
 }
 .app{display:flex;min-height:100vh}
+
 /* ---------- Sidebar ---------- */
 .sidebar{
   width:250px;background:var(--card);border-right:1px solid var(--border);
@@ -131,6 +132,14 @@ body{
 .err{color:var(--expense);font-size:13px;font-weight:600;margin-bottom:12px;min-height:18px}
 .row2{display:flex;gap:10px}
 .row2>*{flex:1}
+
+/* ---------- Email Notification Banner Modal ---------- */
+.email-card{
+  background:#FFF;border:1px solid var(--border);border-radius:16px;padding:20px;box-shadow:0 10px 25px rgba(0,0,0,0.1);
+}
+.email-header{display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:14px;}
+.email-header .mail-icon{font-size:24px;background:#FEF2F2;width:40px;height:40px;border-radius:10px;display:grid;place-items:center;}
+
 canvas{max-width:100%}
 @media(max-width:1000px){
   .g3{grid-template-columns:repeat(2,1fr)}
@@ -161,9 +170,9 @@ canvas{max-width:100%}
           <small id="uplan" style="color: var(--muted); font-size: 12px;">Student</small>
         </div>
       </div>
-      <a href="/logout" title="Đăng xuất" class="logout-btn">
+      <a href="/logout" title="Log out" class="logout-btn">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 2 0 0 1 2-2h4"></path>
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
           <polyline points="16 17 21 12 16 7"></polyline>
           <line x1="21" y1="12" x2="9" y2="12"></line>
         </svg>
@@ -182,7 +191,7 @@ canvas{max-width:100%}
   </main>
 </div>
 
-<!-- Modal Thêm Giao Dịch -->
+<!-- Modal: Add Transaction -->
 <div class="overlay" id="overlay">
   <div class="modal">
     <h3>Add Transaction</h3>
@@ -190,7 +199,7 @@ canvas{max-width:100%}
       <button id="tExp" class="on">Expense</button>
       <button id="tInc">Income</button>
     </div>
-    <div class="field"><label>Merchant / Mô tả</label><input id="fMerchant" placeholder="VD: Highlands Coffee"></div>
+    <div class="field"><label>Merchant / Description</label><input id="fMerchant" placeholder="e.g. Highlands Coffee"></div>
     <div class="row2">
       <div class="field"><label>Amount (&#8363;)</label><input id="fAmount" type="number" min="0" step="1000" placeholder="45000"></div>
       <div class="field"><label>Date</label><input id="fDate" type="date"></div>
@@ -203,6 +212,26 @@ canvas{max-width:100%}
       <button class="btn ghost" id="cancelBtn">Cancel</button>
       <button class="btn" id="saveBtn">Save Transaction</button>
     </div>
+  </div>
+</div>
+
+<!-- Modal: Email Alert for Exceeded Budget -->
+<div class="overlay" id="emailOverlay">
+  <div class="modal email-card">
+    <div class="email-header">
+      <div class="mail-icon">📧</div>
+      <div>
+        <b style="font-size:15px;display:block;">Email Alert Sent!</b>
+        <span style="font-size:12px;color:var(--muted)">To: user@budgetbuddy.app</span>
+      </div>
+    </div>
+    <div style="padding:10px 0;">
+      <p style="font-size:14px;color:var(--expense);font-weight:700;margin-bottom:6px">⚠️ Budget Limit Exceeded Alert</p>
+      <p style="font-size:13.5px;line-height:1.5;color:var(--text)" id="emailText">
+        You have exceeded your limit for category.
+      </p>
+    </div>
+    <button class="btn" style="width:100%;margin-top:15px;background:var(--expense)" onclick="closeEmailModal()">Acknowledge</button>
   </div>
 </div>
 
@@ -219,7 +248,7 @@ const getPeriodLabel = (periodStr) => {
   return date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 };
 
-/* ===== Mock Database ===== */
+/* ===== Mock Storage & Data ===== */
 const currentPeriod = getCurrentPeriod();
 
 const SEED = {
@@ -255,22 +284,32 @@ const SEED = {
   "user": {"initials": "{{ user.username[0].upper() }}", "name": "{{ user.username }}", "plan": "Student"}
 };
 
-const DB = {
-  period: currentPeriod, 
-  user: SEED.user, 
-  accounts: SEED.accounts, 
-  categories: SEED.categories,
-  transactions: SEED.transactions, 
-  limits: SEED.budgets.map(b => ({category_id:b.category_id, limit_vnd:b.limit_vnd}))
-};
+function loadDBFromStorage() {
+  const saved = localStorage.getItem('budget_buddy_db');
+  if (saved) {
+    try { return JSON.parse(saved); } catch(e) { console.error(e); }
+  }
+  return {
+    period: currentPeriod, 
+    user: SEED.user, 
+    accounts: SEED.accounts, 
+    categories: SEED.categories,
+    transactions: SEED.transactions, 
+    limits: SEED.budgets.map(b => ({category_id:b.category_id, limit_vnd:b.limit_vnd}))
+  };
+}
 
-let nextId = 100;
+function saveDBToStorage(db) {
+  localStorage.setItem('budget_buddy_db', JSON.stringify(db));
+}
+
+const DB = loadDBFromStorage();
+let nextId = DB.transactions.length > 0 ? Math.max(...DB.transactions.map(t => t.id), 0) + 1 : 100;
 
 function buildState(){
   const P = DB.period;
   const m = DB.transactions.filter(t => t.date.indexOf(P) === 0);
   
-  // Tính toán lại budgets dựa trên chi tiêu thực tế
   const budgets = DB.limits.map(l => {
     const c = DB.categories.find(x => x.id === l.category_id);
     const spent = -m.filter(t => t.category_id === l.category_id && t.amount < 0).reduce((s,t) => s + t.amount, 0);
@@ -288,7 +327,6 @@ function buildState(){
     };
   });
 
-  // Tính chi tiêu theo 4 tuần linh hoạt từ danh sách giao dịch
   const weekly = [0, 0, 0, 0];
   m.forEach(t => {
     if(t.amount < 0){
@@ -312,9 +350,10 @@ window.fetch = function(url, opts){
     const acc = DB.accounts.find(a => a.id === body.account_id);
     const cat = DB.categories.find(c => c.id === body.category_id);
     const amt = Math.round(Number(body.amount));
-    if(!acc || !cat || !(amt > 0)) return reply({error:'Dữ liệu không hợp lệ'}, false);
+    if(!acc || !cat || !(amt > 0)) return reply({error:'Invalid input data'}, false);
     const signed = body.type === 'income' ? amt : -amt;
     acc.balance += signed;
+    
     DB.transactions.push({
       id: nextId++, 
       merchant: body.merchant, 
@@ -329,7 +368,24 @@ window.fetch = function(url, opts){
       account: acc.name, 
       acc_icon: acc.icon
     });
-    return reply(buildState());
+
+    saveDBToStorage(DB);
+
+    // Check if this transaction causes budget breach
+    const newState = buildState();
+    const targetBudget = newState.budgets.find(b => b.category_id === cat.id);
+    
+    let breachAlert = null;
+    if (body.type === 'expense' && targetBudget && targetBudget.over > 0) {
+      breachAlert = {
+        category: cat.name,
+        spent: targetBudget.spent,
+        limit: targetBudget.limit_vnd,
+        over: targetBudget.over
+      };
+    }
+
+    return reply({ state: newState, breachAlert: breachAlert });
   }
   return reply({error:'404'}, false);
 };
@@ -339,7 +395,7 @@ const $ = s => document.querySelector(s);
 let S = null, txnType = 'expense', charts = [];
 const fmtVND = n => { const a = Math.abs(n); return a >= 1e6 ? (n/1e6).toFixed(1).replace('.0','') + 'M' : Math.round(n/1e3) + 'K'; };
 const money = n => fmtVND(n) + ' ₫';
-const full  = n => n.toLocaleString('vi-VN') + ' ₫';
+const full  = n => n.toLocaleString('en-US') + ' ₫';
 const esc   = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 async function load(){
@@ -351,9 +407,7 @@ function render(){
   charts.forEach(c => c.destroy()); charts = [];
   $('#uname').textContent = S.user.name; $('#uplan').textContent = S.user.plan; $('#avatar').textContent = S.user.initials;
   
-  // Cập nhật khoảng thời gian hiển thị đồng bộ ở Header Topbar
   $('#topbarPeriod').innerHTML = `${getPeriodLabel(S.period)} &middot; All accounts synced`;
-
   $('#budDot').style.display = S.budgets.some(b => b.over > 0) ? 'block' : 'none';
   
   const total = S.budgets.reduce((s,b) => s + b.limit_vnd, 0);
@@ -378,7 +432,7 @@ function render(){
           ${b.over>0?'OVER':b.pct+'%'}</span>
       </div>
       <div class="bar"><i style="width:${Math.min(100,b.pct)}%;background:${col}"></i></div>
-      ${b.over>0?`<div class="over-txt">Over by ${full(b.over)}</div>`:''}
+      ${b.over>0?`<div class="over-txt">Over limit by ${full(b.over)}</div>`:''}
     </div>`;
   }).join('');
   
@@ -394,8 +448,8 @@ function render(){
           <div class="tile" style="background:#EDE9FE">&#10024;</div>
           <div><h3 style="color:#7C3AED">AI Insight</h3>
           <p style="font-size:14px;line-height:1.6;margin-top:8px">
-          ${worst && worst.spent > 0 ? `<b>${esc(worst.category)}</b> đang ở mức <b>${worst.pct}%</b> ngân sách.
-          ${worst.over>0 ? 'Bạn đã vượt giới hạn — hãy tạm dừng chi mục này đến cuối tháng.' : 'Vẫn nằm trong kiểm soát, tiếp tục giữ nhịp nhé!'}` : 'Bạn chưa có chi tiêu đáng kể trong tháng này.'}
+          ${worst && worst.spent > 0 ? `<b>${esc(worst.category)}</b> is currently at <b>${worst.pct}%</b> of budget.
+          ${worst.over>0 ? 'You have exceeded the limit — consider pausing spending in this category until next month.' : 'Everything is under control, keep it up!'}` : 'No significant spending recorded yet this month.'}
           </p></div>
         </div>
       </div>
@@ -436,6 +490,8 @@ function openModal(){
   setType('expense'); $('#overlay').classList.add('open'); $('#fMerchant').focus();
 }
 function closeModal(){ $('#overlay').classList.remove('open'); }
+function closeEmailModal(){ $('#emailOverlay').classList.remove('open'); }
+
 function setType(t){
   txnType = t; $('#tExp').classList.toggle('on', t === 'expense'); $('#tInc').classList.toggle('on', t === 'income');
   const cats = S.categories.filter(c => c.kind === txnType);
@@ -443,12 +499,13 @@ function setType(t){
   $('#fAcc').innerHTML = S.accounts.map(a => `<option value="${a.id}">${a.icon} ${esc(a.name)} — ${full(a.balance)}</option>`).join('');
   updatePreview();
 }
+
 function updatePreview(){
   const acc = S.accounts.find(a => a.id == $('#fAcc').value);
   const amt = parseInt($('#fAmount').value || 0, 10);
   if(!acc){ $('#preview').textContent = ''; return; }
   const after = acc.balance + (txnType === 'income' ? amt : -amt);
-  $('#preview').innerHTML = `Số dư <b>${esc(acc.name)}</b> sau giao dịch: <b style="color:${after < 0 ? '#DC2626' : '#059669'}">${full(after)}</b>`;
+  $('#preview').innerHTML = `Balance of <b>${esc(acc.name)}</b> after transaction: <b style="color:${after < 0 ? '#DC2626' : '#059669'}">${full(after)}</b>`;
 }
 
 $('#openModal').onclick = openModal;
@@ -458,6 +515,8 @@ $('#tInc').onclick = () => setType('income');
 $('#fAcc').onchange = updatePreview;
 $('#fAmount').oninput = updatePreview;
 $('#overlay').onclick = e => { if(e.target === $('#overlay')) closeModal(); };
+$('#emailOverlay').onclick = e => { if(e.target === $('#emailOverlay')) closeEmailModal(); };
+
 $('#saveBtn').onclick = async () => {
   try{
     const r = await fetch('/api/transactions', {
@@ -472,9 +531,20 @@ $('#saveBtn').onclick = async () => {
         account_id:parseInt($('#fAcc').value,10)
       })
     });
-    S = await r.json(); closeModal(); render();
+    const res = await r.json();
+    S = res.state; 
+    closeModal(); 
+    render();
+
+    // Trigger Email Notification Modal if budget is exceeded
+    if(res.breachAlert) {
+      const b = res.breachAlert;
+      $('#emailText').innerHTML = `Your spending in <b>${esc(b.category)}</b> has reached <b>${full(b.spent)}</b>, exceeding your budget limit of <b>${full(b.limit)}</b> by <b>${full(b.over)}</b>.`;
+      $('#emailOverlay').classList.add('open');
+    }
   }catch(e){ $('#err').textContent = e.message; }
 };
+
 load();
 </script>
 </body>
