@@ -199,9 +199,9 @@ tr.txn:hover .del{opacity:1}
     <!-- Profile duy nhất ở đáy Sidebar -->
     <div class="profile">
       <div style="display: flex; gap: 12px; align-items: center; min-width: 0;">
-        <div class="avatar" id="avatar">{{ user.username[0].upper() }}</div>
+        <div class="avatar" id="avatar">{{ user.username[0].upper() if user and user.username else 'A' }}</div>
         <div style="min-width: 0;">
-          <b id="uname" style="font-size: 14px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ user.username }}</b>
+          <b id="uname" style="font-size: 14px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ user.username if user and user.username else 'Anh Thu' }}</b>
           <small id="uplan" style="color: var(--muted); font-size: 12px;">Student</small>
         </div>
       </div>
@@ -304,27 +304,58 @@ function reply(obj, ok){
   return Promise.resolve({ok: ok !== false, json: () => Promise.resolve(obj)});
 }
 
-window.fetch = function(url, opts){
+// 1. Lưu lại hàm nativeFetch để gửi API thật tới Flask DB
+const nativeFetch = window.fetch;
+
+window.fetch = async function(url, opts){
   opts = opts || {};
   const body = opts.body ? JSON.parse(opts.body) : {};
+
   if(url === '/api/state') return reply(buildState());
+
   if(url === '/api/transactions' && opts.method === 'POST'){
     const merchant = (body.merchant || '').trim();
     const amount = Math.round(Number(body.amount));
     if(!merchant) return reply({error:'Vui lòng nhập tên giao dịch'}, false);
     if(!(amount > 0)) return reply({error:'Số tiền phải lớn hơn 0'}, false);
+    
     const acc = DB.accounts.find(a => a.id === body.account_id);
     const cat = DB.categories.find(c => c.id === body.category_id);
     if(!acc || !cat) return reply({error:'Thiếu danh mục hoặc tài khoản'}, false);
+    
     const signed = body.type === 'income' ? amount : -amount;
     if(acc.balance + signed < 0) return reply({error:'Số dư ' + acc.name + ' không đủ'}, false);
+    
     acc.balance += signed;
-    DB.transactions.push({id: nextId++, merchant: merchant, amount: signed,
+    const newTxn = {
+      id: nextId++, merchant: merchant, amount: signed,
       date: body.date || DB.period + '-28', category_id: cat.id, account_id: acc.id,
       ai_tagged: 0, category: cat.name, cat_icon: cat.icon, color: cat.color, bg: cat.bg,
-      account: acc.name, acc_icon: acc.icon});
+      account: acc.name, acc_icon: acc.icon
+    };
+    DB.transactions.push(newTxn);
+
+    // Gửi API POST thật về Flask DB ở background
+    try {
+      await nativeFetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          merchant: merchant,
+          amount: signed,
+          category: cat.name,
+          account: acc.name,
+          date: body.date,
+          type: body.type
+        })
+      });
+    } catch(err) {
+      console.warn("Không thể đồng bộ với Flask DB:", err);
+    }
+
     return reply(buildState());
   }
+
   if(url.indexOf('/api/transactions/') === 0 && opts.method === 'DELETE'){
     const id = parseInt(url.split('/').pop(), 10);
     const i = DB.transactions.findIndex(t => t.id === id);
@@ -333,8 +364,17 @@ window.fetch = function(url, opts){
     const acc = DB.accounts.find(a => a.id === t.account_id);
     if(acc) acc.balance -= t.amount;
     DB.transactions.splice(i, 1);
+
+    // Gửi API DELETE thật về Flask DB ở background
+    try {
+      await nativeFetch('/api/transactions/' + id, { method: 'DELETE' });
+    } catch(err) {
+      console.warn("Không thể xoá trên Flask DB:", err);
+    }
+
     return reply(buildState());
   }
+
   return reply({error:'404'}, false);
 };
 
@@ -350,10 +390,58 @@ const fmtVND = n => {
 };
 const money = n => fmtVND(n) + ' ₫';
 const full  = n => n.toLocaleString('vi-VN') + ' ₫';
-const dmy   = d => { const p = d.split('-'); return p[2] + '/' + p[1]; };
-const esc   = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const dmy   = d => { if(!d) return ''; const p = d.split('-'); return (p[2]||'') + '/' + (p[1]||''); };
+const esc   = s => String(s || '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 async function load(){
+  try {
+    // 1. Kéo dữ liệu thật từ Flask DB về khi F5
+    const res = await nativeFetch('/api/transactions');
+    if (res.ok) {
+      const dbTxns = await res.json();
+      if (Array.isArray(dbTxns) && dbTxns.length > 0) {
+        const realMapped = dbTxns.map((t, idx) => {
+          const merchantName = t.merchant || t.note || 'Giao dịch';
+
+          // Match category linh hoạt theo tên
+          const cat = DB.categories.find(c => 
+            c.name.toLowerCase() === (t.category || '').toLowerCase()
+          ) || DB.categories[0];
+
+          // Match account linh hoạt theo tên
+          const acc = DB.accounts.find(a => 
+            a.name.toLowerCase() === (t.account || '').toLowerCase()
+          ) || DB.accounts[0];
+
+          let amt = Number(t.amount) || 0;
+          if (t.type === 'expense' && amt > 0) amt = -amt;
+
+          return {
+            id: t.id || (999000 + idx),
+            merchant: merchantName,
+            amount: amt,
+            date: t.date || DB.period + '-28',
+            category_id: cat.id,
+            account_id: acc.id,
+            ai_tagged: 0,
+            category: cat.name,
+            cat_icon: cat.icon,
+            color: cat.color,
+            bg: cat.bg,
+            account: acc.name,
+            acc_icon: acc.icon
+          };
+        });
+
+        // Đưa các giao dịch thật mới thêm lên đầu danh sách
+        DB.transactions = [...realMapped, ...SEED.transactions];
+      }
+    }
+  } catch(e) {
+    console.warn("Chưa lấy được dữ liệu từ Flask DB, dùng SEED mặc định:", e);
+  }
+
+  // 2. Lấy lại state hoàn chỉnh và render UI
   const r = await fetch('/api/state');
   S = await r.json();
   render();
@@ -392,7 +480,7 @@ function vTxns(){
   const startMMDD = getMMDD(startDate);
   const endMMDD   = getMMDD(endDate);
 
-  // Lọc dữ liệu (Bỏ qua yếu tố Năm)
+  // Lọc dữ liệu
   const list = S.transactions.filter(t => {
     const matchSearch = !q || t.merchant.toLowerCase().includes(q) || t.category.toLowerCase().includes(q) || t.account.toLowerCase().includes(q);
     const matchCat    = (selectedCat === 'all') || (String(t.category_id) === String(selectedCat));

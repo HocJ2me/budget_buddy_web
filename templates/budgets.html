@@ -172,7 +172,7 @@ canvas{max-width:100%}
   </aside>
   <main class="main">
     <header class="topbar">
-      <div><h2>Budgets</h2><p>July 2025 &middot; All accounts synced</p></div>
+      <div><h2>Budgets</h2><p id="topbarPeriod">All accounts synced</p></div>
       <div style="display:flex;gap:12px;align-items:center">
         <div class="synced"><i class="pulse"></i> Synced</div>
         <button class="btn" id="openModal">+ Add Transaction</button>
@@ -207,31 +207,104 @@ canvas{max-width:100%}
 </div>
 
 <script>
+/* ===== Helpers for Dynamic Time ===== */
+const getCurrentPeriod = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+const getPeriodLabel = (periodStr) => {
+  const [year, month] = periodStr.split('-');
+  const date = new Date(year, month - 1);
+  return date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+};
+
 /* ===== Mock Database ===== */
+const currentPeriod = getCurrentPeriod();
+
 const SEED = {
-  "accounts": [{"balance": 520000, "icon": "💵", "id": 1, "name": "Personal Wallet", "type": "cash"}, {"balance": 1450000, "icon": "🏦", "id": 2, "name": "MB Bank", "type": "bank"}, {"balance": 480000, "icon": "🏦", "id": 3, "name": "Techcombank", "type": "bank"}, {"balance": 260000, "icon": "📱", "id": 4, "name": "MoMo", "type": "ewallet"}, {"balance": 90000, "icon": "📱", "id": 5, "name": "ShopeePay", "type": "ewallet"}], 
-  "budgets": [{"bg": "#FEF3C7", "category": "Food & Drinks", "category_id": 1, "color": "#B45309", "icon": "🍜", "id": 1, "limit_vnd": 600000, "over": 0, "pct": 80, "period": "2025-07", "spent": 480000}, {"bg": "#EDE9FE", "category": "Transport", "category_id": 2, "color": "#6D28D9", "icon": "🛵", "id": 2, "limit_vnd": 150000, "over": 0, "pct": 87, "period": "2025-07", "spent": 130000}, {"bg": "#FCE7F3", "category": "Entertainment", "category_id": 4, "color": "#BE185D", "icon": "🎬", "id": 3, "limit_vnd": 80000, "over": 85000, "pct": 206, "period": "2025-07", "spent": 165000}, {"bg": "#DBEAFE", "category": "Education", "category_id": 3, "color": "#1D4ED8", "icon": "📚", "id": 4, "limit_vnd": 300000, "over": 0, "pct": 86, "period": "2025-07", "spent": 257000}, {"bg": "#CCFBF1", "category": "Shopping", "category_id": 5, "color": "#0F766E", "icon": "🛍", "id": 5, "limit_vnd": 100000, "over": 59000, "pct": 159, "period": "2025-07", "spent": 159000}], 
-  "categories": [{"bg": "#FEF3C7", "color": "#B45309", "icon": "🍜", "id": 1, "kind": "expense", "name": "Food & Drinks"}, {"bg": "#EDE9FE", "color": "#6D28D9", "icon": "🛵", "id": 2, "kind": "expense", "name": "Transport"}, {"bg": "#DBEAFE", "color": "#1D4ED8", "icon": "📚", "id": 3, "kind": "expense", "name": "Education"}, {"bg": "#FCE7F3", "color": "#BE185D", "icon": "🎬", "id": 4, "kind": "expense", "name": "Entertainment"}, {"bg": "#CCFBF1", "color": "#0F766E", "icon": "🛍", "id": 5, "kind": "expense", "name": "Shopping"}, {"bg": "#D1FAE5", "color": "#047857", "icon": "💼", "id": 6, "kind": "income", "name": "Income"}], 
-  "transactions": [{"acc_icon": "📱", "account": "MoMo", "account_id": 4, "ai_tagged": 1, "amount": -45000, "bg": "#FEF3C7", "cat_icon": "🍜", "category": "Food & Drinks", "category_id": 1, "color": "#B45309", "created_at": "2026-07-29 09:26:45", "date": "2025-07-26", "id": 1, "merchant": "Highlands Coffee"}], 
+  "accounts": [
+    {"balance": 520000, "icon": "💵", "id": 1, "name": "Personal Wallet", "type": "cash"}, 
+    {"balance": 1450000, "icon": "🏦", "id": 2, "name": "MB Bank", "type": "bank"}, 
+    {"balance": 480000, "icon": "🏦", "id": 3, "name": "Techcombank", "type": "bank"}, 
+    {"balance": 260000, "icon": "📱", "id": 4, "name": "MoMo", "type": "ewallet"}, 
+    {"balance": 90000, "icon": "📱", "id": 5, "name": "ShopeePay", "type": "ewallet"}
+  ], 
+  "budgets": [
+    {"bg": "#FEF3C7", "category": "Food & Drinks", "category_id": 1, "color": "#B45309", "icon": "🍜", "id": 1, "limit_vnd": 600000}, 
+    {"bg": "#EDE9FE", "category": "Transport", "category_id": 2, "color": "#6D28D9", "icon": "🛵", "id": 2, "limit_vnd": 150000}, 
+    {"bg": "#FCE7F3", "category": "Entertainment", "category_id": 4, "color": "#BE185D", "icon": "🎬", "id": 3, "limit_vnd": 80000}, 
+    {"bg": "#DBEAFE", "category": "Education", "category_id": 3, "color": "#1D4ED8", "icon": "📚", "id": 4, "limit_vnd": 300000}, 
+    {"bg": "#CCFBF1", "category": "Shopping", "category_id": 5, "color": "#0F766E", "icon": "🛍", "id": 5, "limit_vnd": 100000}
+  ], 
+  "categories": [
+    {"bg": "#FEF3C7", "color": "#B45309", "icon": "🍜", "id": 1, "kind": "expense", "name": "Food & Drinks"}, 
+    {"bg": "#EDE9FE", "color": "#6D28D9", "icon": "🛵", "id": 2, "kind": "expense", "name": "Transport"}, 
+    {"bg": "#DBEAFE", "color": "#1D4ED8", "icon": "📚", "id": 3, "kind": "expense", "name": "Education"}, 
+    {"bg": "#FCE7F3", "color": "#BE185D", "icon": "🎬", "id": 4, "kind": "expense", "name": "Entertainment"}, 
+    {"bg": "#CCFBF1", "color": "#0F766E", "icon": "🛍", "id": 5, "kind": "expense", "name": "Shopping"}, 
+    {"bg": "#D1FAE5", "color": "#047857", "icon": "💼", "id": 6, "kind": "income", "name": "Income"}
+  ], 
+  "transactions": [
+    {"acc_icon": "📱", "account": "MoMo", "account_id": 4, "ai_tagged": 1, "amount": -45000, "bg": "#FEF3C7", "cat_icon": "🍜", "category": "Food & Drinks", "category_id": 1, "color": "#B45309", "created_at": "2026-07-29 09:26:45", "date": `${currentPeriod}-05`, "id": 1, "merchant": "Highlands Coffee"},
+    {"acc_icon": "🏦", "account": "MB Bank", "account_id": 2, "ai_tagged": 1, "amount": -165000, "bg": "#FCE7F3", "cat_icon": "🎬", "category": "Entertainment", "category_id": 4, "color": "#BE185D", "created_at": "2026-07-29 10:00:00", "date": `${currentPeriod}-12`, "id": 2, "merchant": "CGV Cinema"},
+    {"acc_icon": "📱", "account": "ShopeePay", "account_id": 5, "ai_tagged": 1, "amount": -159000, "bg": "#CCFBF1", "cat_icon": "🛍", "category": "Shopping", "category_id": 5, "color": "#0F766E", "created_at": "2026-07-29 11:00:00", "date": `${currentPeriod}-18`, "id": 3, "merchant": "Uniqlo"},
+    {"acc_icon": "💵", "account": "Personal Wallet", "account_id": 1, "ai_tagged": 1, "amount": -130000, "bg": "#EDE9FE", "cat_icon": "🛵", "category": "Transport", "category_id": 2, "color": "#6D28D9", "created_at": "2026-07-29 12:00:00", "date": `${currentPeriod}-22`, "id": 4, "merchant": "Grab Bike"},
+    {"acc_icon": "🏦", "account": "Techcombank", "account_id": 3, "ai_tagged": 1, "amount": -257000, "bg": "#DBEAFE", "cat_icon": "📚", "category": "Education", "category_id": 3, "color": "#1D4ED8", "created_at": "2026-07-29 14:00:00", "date": `${currentPeriod}-25`, "id": 5, "merchant": "Fahasa Books"}
+  ], 
   "user": {"initials": "{{ user.username[0].upper() }}", "name": "{{ user.username }}", "plan": "Student"}
 };
+
 const DB = {
-  period: "2025-07", user: SEED.user, accounts: SEED.accounts, categories: SEED.categories,
-  transactions: SEED.transactions, limits: SEED.budgets.map(b => ({category_id:b.category_id, limit_vnd:b.limit_vnd}))
+  period: currentPeriod, 
+  user: SEED.user, 
+  accounts: SEED.accounts, 
+  categories: SEED.categories,
+  transactions: SEED.transactions, 
+  limits: SEED.budgets.map(b => ({category_id:b.category_id, limit_vnd:b.limit_vnd}))
 };
+
 let nextId = 100;
+
 function buildState(){
   const P = DB.period;
   const m = DB.transactions.filter(t => t.date.indexOf(P) === 0);
+  
+  // Tính toán lại budgets dựa trên chi tiêu thực tế
   const budgets = DB.limits.map(l => {
     const c = DB.categories.find(x => x.id === l.category_id);
     const spent = -m.filter(t => t.category_id === l.category_id && t.amount < 0).reduce((s,t) => s + t.amount, 0);
-    return {category_id:l.category_id, limit_vnd:l.limit_vnd, category:c.name, icon:c.icon, color:c.color, bg:c.bg, spent:spent, pct: Math.round(spent / l.limit_vnd * 100), over: Math.max(0, spent - l.limit_vnd)};
+    const pct = l.limit_vnd > 0 ? Math.round(spent / l.limit_vnd * 100) : 0;
+    return {
+      category_id: l.category_id, 
+      limit_vnd: l.limit_vnd, 
+      category: c.name, 
+      icon: c.icon, 
+      color: c.color, 
+      bg: c.bg, 
+      spent: spent, 
+      pct: pct, 
+      over: Math.max(0, spent - l.limit_vnd)
+    };
   });
-  const weekly = [344000, 225000, 295000, 327000];
-  return {period:P, user:DB.user, accounts:DB.accounts, categories:DB.categories, budgets:budgets, charts:{weekly:weekly}};
+
+  // Tính chi tiêu theo 4 tuần linh hoạt từ danh sách giao dịch
+  const weekly = [0, 0, 0, 0];
+  m.forEach(t => {
+    if(t.amount < 0){
+      const day = parseInt(t.date.split('-')[2], 10);
+      if(day <= 7) weekly[0] += Math.abs(t.amount);
+      else if(day <= 14) weekly[1] += Math.abs(t.amount);
+      else if(day <= 21) weekly[2] += Math.abs(t.amount);
+      else weekly[3] += Math.abs(t.amount);
+    }
+  });
+
+  return {period: P, user: DB.user, accounts: DB.accounts, categories: DB.categories, budgets: budgets, charts: {weekly: weekly}};
 }
+
 function reply(obj, ok){ return Promise.resolve({ok: ok !== false, json: () => Promise.resolve(obj)}); }
+
 window.fetch = function(url, opts){
   opts = opts || {}; const body = opts.body ? JSON.parse(opts.body) : {};
   if(url === '/api/state') return reply(buildState());
@@ -242,7 +315,20 @@ window.fetch = function(url, opts){
     if(!acc || !cat || !(amt > 0)) return reply({error:'Dữ liệu không hợp lệ'}, false);
     const signed = body.type === 'income' ? amt : -amt;
     acc.balance += signed;
-    DB.transactions.push({id: nextId++, merchant: body.merchant, amount: signed, date: body.date, category_id: cat.id, account_id: acc.id, category: cat.name, cat_icon: cat.icon, color: cat.color, bg: cat.bg, account: acc.name, acc_icon: acc.icon});
+    DB.transactions.push({
+      id: nextId++, 
+      merchant: body.merchant, 
+      amount: signed, 
+      date: body.date, 
+      category_id: cat.id, 
+      account_id: acc.id, 
+      category: cat.name, 
+      cat_icon: cat.icon, 
+      color: cat.color, 
+      bg: cat.bg, 
+      account: acc.name, 
+      acc_icon: acc.icon
+    });
     return reply(buildState());
   }
   return reply({error:'404'}, false);
@@ -264,6 +350,10 @@ function render(){
   if(!S) return;
   charts.forEach(c => c.destroy()); charts = [];
   $('#uname').textContent = S.user.name; $('#uplan').textContent = S.user.plan; $('#avatar').textContent = S.user.initials;
+  
+  // Cập nhật khoảng thời gian hiển thị đồng bộ ở Header Topbar
+  $('#topbarPeriod').innerHTML = `${getPeriodLabel(S.period)} &middot; All accounts synced`;
+
   $('#budDot').style.display = S.budgets.some(b => b.over > 0) ? 'block' : 'none';
   
   const total = S.budgets.reduce((s,b) => s + b.limit_vnd, 0);
@@ -296,7 +386,7 @@ function render(){
   
   $('#view').innerHTML = `<div class="grid g3">${cards}</div>
   <div class="grid g2">
-    <div class="card"><h3>Category limits &middot; ${S.period}</h3>${bars}</div>
+    <div class="card"><h3>Category limits &middot; ${getPeriodLabel(S.period)}</h3>${bars}</div>
     <div style="display:flex;flex-direction:column;gap:16px">
       <div class="card"><h3>Weekly Spend</h3><canvas id="bars" height="200"></canvas></div>
       <div class="card" style="background:#F5F3FF;border-color:#DDD6FE">
@@ -304,8 +394,8 @@ function render(){
           <div class="tile" style="background:#EDE9FE">&#10024;</div>
           <div><h3 style="color:#7C3AED">AI Insight</h3>
           <p style="font-size:14px;line-height:1.6;margin-top:8px">
-          ${worst ? `<b>${esc(worst.category)}</b> đang ở mức <b>${worst.pct}%</b> ngân sách.
-          ${worst.over>0 ? 'Bạn đã vượt giới hạn — hãy tạm dừng chi mục này đến cuối tháng.' : 'Vẫn nằm trong kiểm soát, tiếp tục giữ nhịp nhé!'}` : ''}
+          ${worst && worst.spent > 0 ? `<b>${esc(worst.category)}</b> đang ở mức <b>${worst.pct}%</b> ngân sách.
+          ${worst.over>0 ? 'Bạn đã vượt giới hạn — hãy tạm dừng chi mục này đến cuối tháng.' : 'Vẫn nằm trong kiểm soát, tiếp tục giữ nhịp nhé!'}` : 'Bạn chưa có chi tiêu đáng kể trong tháng này.'}
           </p></div>
         </div>
       </div>
@@ -316,15 +406,32 @@ function render(){
   if(barsCanvas){
     const w = S.charts.weekly; const mx = Math.max(...w);
     charts.push(new Chart(barsCanvas, {
-      type:'bar', data:{labels:['Wk 1','Wk 2','Wk 3','Wk 4'], datasets:[{data:w, backgroundColor:w.map(v => v===mx?'#F87171':'#2DA89C'), borderRadius:6, barThickness:36}]},
-      options:{plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,grid:{color:'#F1F5F9'},ticks:{callback:v=>fmtVND(v),color:'#94A3B8'}}, x:{grid:{display:false},ticks:{color:'#94A3B8'}}}}
+      type:'bar', 
+      data:{
+        labels:['Wk 1','Wk 2','Wk 3','Wk 4'], 
+        datasets:[{
+          data:w, 
+          backgroundColor:w.map(v => (v > 0 && v === mx) ? '#F87171' : '#2DA89C'), 
+          borderRadius:6, 
+          barThickness:36
+        }]
+      },
+      options:{
+        plugins:{legend:{display:false}}, 
+        scales:{
+          y:{beginAtZero:true,grid:{color:'#F1F5F9'},ticks:{callback:v=>fmtVND(v),color:'#94A3B8'}}, 
+          x:{grid:{display:false},ticks:{color:'#94A3B8'}}
+        }
+      }
     }));
   }
 }
 
 /* Modal Actions */
 function openModal(){
-  $('#fDate').value = S.period + '-' + String(new Date().getDate()).padStart(2,'0');
+  const today = new Date();
+  const dateStr = `${S.period}-${String(today.getDate()).padStart(2,'0')}`;
+  $('#fDate').value = dateStr;
   $('#fMerchant').value = ''; $('#fAmount').value = ''; $('#err').textContent = '';
   setType('expense'); $('#overlay').classList.add('open'); $('#fMerchant').focus();
 }
@@ -353,7 +460,18 @@ $('#fAmount').oninput = updatePreview;
 $('#overlay').onclick = e => { if(e.target === $('#overlay')) closeModal(); };
 $('#saveBtn').onclick = async () => {
   try{
-    const r = await fetch('/api/transactions', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({merchant:$('#fMerchant').value, amount:$('#fAmount').value, date:$('#fDate').value, type:txnType, category_id:parseInt($('#fCat').value,10), account_id:parseInt($('#fAcc').value,10)})});
+    const r = await fetch('/api/transactions', {
+      method:'POST', 
+      headers:{'Content-Type':'application/json'}, 
+      body:JSON.stringify({
+        merchant:$('#fMerchant').value, 
+        amount:$('#fAmount').value, 
+        date:$('#fDate').value, 
+        type:txnType, 
+        category_id:parseInt($('#fCat').value,10), 
+        account_id:parseInt($('#fAcc').value,10)
+      })
+    });
     S = await r.json(); closeModal(); render();
   }catch(e){ $('#err').textContent = e.message; }
 };

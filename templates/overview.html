@@ -285,27 +285,71 @@ function reply(obj, ok){
   return Promise.resolve({ok: ok !== false, json: () => Promise.resolve(obj)});
 }
 
-window.fetch = function(url, opts){
+// 1. Lưu lại hàm fetch nguyên bản của trình duyệt
+const nativeFetch = window.fetch;
+
+window.fetch = async function(url, opts){
   opts = opts || {};
   const body = opts.body ? JSON.parse(opts.body) : {};
+
+  // Giữ nguyên API lấy state giao diện từ SEED/DB trong RAM
   if(url === '/api/state') return reply(buildState());
+
+  // Khi bấm Thêm Giao Dịch
   if(url === '/api/transactions' && opts.method === 'POST'){
     const merchant = (body.merchant || '').trim();
     const amount = Math.round(Number(body.amount));
+
     if(!merchant) return reply({error:'Vui lòng nhập tên giao dịch'}, false);
     if(!(amount > 0)) return reply({error:'Số tiền phải lớn hơn 0'}, false);
+
     const acc = DB.accounts.find(a => a.id === body.account_id);
     const cat = DB.categories.find(c => c.id === body.category_id);
     if(!acc || !cat) return reply({error:'Thiếu danh mục hoặc tài khoản'}, false);
+
     const signed = body.type === 'income' ? amount : -amount;
     if(acc.balance + signed < 0) return reply({error:'Số dư ' + acc.name + ' không đủ'}, false);
+
+    // Update giao diện tạm thời trong RAM
     acc.balance += signed;
-    DB.transactions.push({id: nextId++, merchant: merchant, amount: signed,
-      date: body.date || DB.period + '-28', category_id: cat.id, account_id: acc.id,
-      ai_tagged: 0, category: cat.name, cat_icon: cat.icon, color: cat.color, bg: cat.bg,
-      account: acc.name, acc_icon: acc.icon});
+    const newTxn = {
+      id: nextId++,
+      merchant: merchant,
+      amount: signed,
+      date: body.date || DB.period + '-28',
+      category_id: cat.id,
+      account_id: acc.id,
+      ai_tagged: 0,
+      category: cat.name,
+      cat_icon: cat.icon,
+      color: cat.color,
+      bg: cat.bg,
+      account: acc.name,
+      acc_icon: acc.icon
+    };
+    DB.transactions.push(newTxn);
+
+    // 2. GỬI DỮ LIỆU THẬT VỀ FLASK DB (Background)
+    try {
+      await nativeFetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          merchant: merchant,
+          amount: signed,
+          category: cat.name,
+          account: acc.name,
+          date: body.date,
+          type: body.type
+        })
+      });
+    } catch(err) {
+      console.warn("Không thể đồng bộ với Flask Database:", err);
+    }
+
     return reply(buildState());
   }
+
   return reply({error:'404'}, false);
 };
 
@@ -325,6 +369,58 @@ const dmy   = d => { const p = d.split('-'); return p[2] + '/' + p[1]; };
 const esc   = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 async function load(){
+  try {
+    // 1. Kéo dữ liệu từ Flask DB
+    const res = await nativeFetch('/api/transactions');
+    if (res.ok) {
+      const dbTxns = await res.json();
+      if (Array.isArray(dbTxns) && dbTxns.length > 0) {
+        
+        // 2. Map dữ liệu linh hoạt (ưu tiên t.merchant, nếu ko có lấy t.note)
+        const realMapped = dbTxns.map((t, idx) => {
+          // Lấy đúng tên merchant
+          const merchantName = t.merchant || t.note || 'Giao dịch';
+
+          // Tìm Category
+          const cat = DB.categories.find(c => 
+            c.name.toLowerCase() === (t.category || '').toLowerCase()
+          ) || DB.categories[0];
+
+          // Tìm Account
+          const acc = DB.accounts.find(a => 
+            a.name.toLowerCase() === (t.account || '').toLowerCase()
+          ) || DB.accounts[0];
+
+          // Xử lý dấu âm/dương cho số tiền
+          let amt = Number(t.amount) || 0;
+          if (t.type === 'expense' && amt > 0) amt = -amt;
+
+          return {
+            id: 999000 + (t.id || idx),
+            merchant: merchantName,
+            amount: amt,
+            date: t.date || DB.period + '-28',
+            category_id: cat.id,
+            account_id: acc.id,
+            ai_tagged: 0,
+            category: cat.name,
+            cat_icon: cat.icon,
+            color: cat.color,
+            bg: cat.bg,
+            account: acc.name,
+            acc_icon: acc.icon
+          };
+        });
+
+        // 3. Gộp dữ liệu thật lên trên dữ liệu mẫu SEED
+        DB.transactions = [...realMapped, ...SEED.transactions];
+      }
+    }
+  } catch(e) {
+    console.warn("Dùng SEED mặc định:", e);
+  }
+
+  // Render lại giao diện
   const r = await fetch('/api/state');
   S = await r.json();
   render();
@@ -476,20 +572,55 @@ $('#fAmount').oninput = updatePreview;
 $('#overlay').onclick = e => { if(e.target === $('#overlay')) closeModal(); };
 $('#saveBtn').onclick = async () => {
   $('#err').textContent = '';
-  try{
-    S = await post('/api/transactions', {
-      merchant: $('#fMerchant').value,
-      amount:   $('#fAmount').value,
-      date:     $('#fDate').value,
-      type:     txnType,
-      category_id: parseInt($('#fCat').value, 10),
-      account_id:  parseInt($('#fAcc').value, 10),
+  
+  // 1. Lấy dữ liệu chính xác từ các ô Input theo ID trong file của bạn
+  const merchantVal = $('#fMerchant').value.trim();
+  const amountVal   = parseFloat($('#fAmount').value) || 0;
+  const dateVal     = $('#fDate').value;
+  const catId       = parseInt($('#fCat').value, 10);
+  const accId       = parseInt($('#fAcc').value, 10);
+
+  // Tìm tên danh mục và tài khoản tương ứng
+  const catObj = S.categories.find(c => c.id === catId);
+  const accObj = S.accounts.find(a => a.id === accId);
+
+  // 2. Đóng gói thông tin gửi về Backend Flask
+  const payload = {
+    merchant: merchantVal,
+    amount: amountVal,
+    date: dateVal,
+    type: txnType, // 'expense' hoặc 'income'
+    category_id: catId,
+    account_id: accId,
+    category: catObj ? catObj.name : 'Other',
+    account: accObj ? accObj.name : 'Personal Wallet'
+  };
+
+  try {
+    // 3. Gửi Request POST thực sự về API Flask
+    const response = await fetch('/api/transactions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
     });
-    closeModal(); render();
-  }catch(e){ $('#err').textContent = e.message; }
+
+    if (response.ok) {
+      closeModal();
+      await load(); // Tải lại toàn bộ dữ liệu từ DB để giao diện cập nhật chuẩn nhất
+    } else {
+      const errData = await response.json();
+      $('#err').textContent = errData.error || errData.message || 'Không thể lưu giao dịch!';
+    }
+  } catch (e) {
+    console.error('Lỗi kết nối:', e);
+    $('#err').textContent = 'Lỗi kết nối tới server Flask!';
+  }
 };
 
 load();
 </script>
+
 </body>
 </html>
