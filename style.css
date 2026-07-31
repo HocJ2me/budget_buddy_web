@@ -1,0 +1,171 @@
+/* ==========================================
+   1. GLOBAL VARIABLES & RESET
+   ========================================== */
+:root {
+  --bg: #F8FAFC;
+  --card: #FFFFFF;
+  --text: #334155;
+  --muted: #94A3B8;
+  --border: #E2E8F0;
+  --accent: #0D9488;
+  --accent-2: #14B8A6;
+  --expense: #DC2626;
+  --expense-bg: #FEE2E2;
+  --sidebar-width: 260px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ==========================================
+   2. SIDEBAR & NAVIGATION
+   ========================================== */
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+}
+
+.brand {
+  padding: 24px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.25);
+}
+
+.nav-menu {
+  list-style: none;
+  padding: 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.nav-link:hover,
+.nav-link.active {
+  color: var(--accent);
+  background: rgba(13, 148, 136, 0.08);
+}
+
+/* ==========================================
+   3. PROFILE & LOGOUT AREA (FIXED)
+   ========================================== */
+.profile {
+  margin-top: auto;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 16px 20px !important;
+  border-top: 1px solid var(--border) !important;
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--card);
+}
+
+.profile-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.avatar {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  border-radius: 50% !important;
+  display: grid !important;
+  place-items: center !important;
+  color: #FFFFFF !important;
+  font-weight: 700 !important;
+  font-size: 15px !important;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
+  flex-shrink: 0 !important;
+}
+
+.profile-details {
+  min-width: 0;
+}
+
+.profile-details b {
+  font-size: 14px;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+
+.profile-details small {
+  color: var(--muted);
+  font-size: 12px;
+  display: block;
+}
+
+.logout-btn {
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.logout-btn:hover {
+  color: var(--expense);
+  background: var(--expense-bg);
+}
+
+/* ==========================================
+   4. MAIN CONTENT AREA
+   ========================================== */
+.main-content {
+  margin-left: var(--sidebar-width);
+  flex: 1;
+  padding: 32px;
+  min-height: 100vh;
+}
