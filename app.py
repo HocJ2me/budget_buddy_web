@@ -140,7 +140,8 @@ def budgets():
 @app.route('/goals')
 @login_required
 def goals():
-    return render_template('goals.html', user=current_user)
+    goals_list = Goal.query.all()
+    return render_template('goals.html', user=current_user, goals=goals_list)
 
 
 @app.route('/ai-coach')

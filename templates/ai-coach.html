@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Budget Buddy 2.0 — AI Coach</title>
+<title>Budget Buddy — AI Coach</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -120,7 +120,7 @@ body{
   <aside class="sidebar">
     <div class="brand">
       <div class="logo">&#128176;</div>
-      <div><h1>Budget Buddy</h1><span>2.0 &middot; Smart Finance</span></div>
+      <div><h1>Budget Buddy</h1><span> &middot; Smart Finance</span></div>
     </div>
     <nav class="nav">
       <a href="/">&#127968; <span class="lbl">Overview</span></a>
@@ -158,7 +158,10 @@ body{
 </div>
 
 <script>
-/* ===== Mock Database ===== */
+/* ===== Shared Database Core (Preserve SEED & Merge User Txns) ===== */
+const USERNAME = "{{ user.username }}";
+const USER_TXN_KEY = 'budget_buddy_txns_' + USERNAME;
+
 const SEED = {
   "user": {"initials": "{{ user.username[0].upper() }}", "name": "{{ user.username }}", "plan": "Student"},
   "notifications": [
@@ -166,16 +169,52 @@ const SEED = {
     {"ago": "1d ago", "id": 2, "kind": "done", "text": "Emergency Fund goal completed! Congratulations"},
     {"ago": "2d ago", "id": 3, "kind": "warn", "text": "Transport budget at 87% - approaching limit"}
   ],
-  "kpi": {"balance": 2800000, "expense": 1191000, "income": 4000000, "savings_rate": 70},
   "accounts": [{"balance": 520000, "name": "Personal Wallet"}, {"balance": 1450000, "name": "MB Bank"}],
   "goals": [{"name": "MacBook Air M3", "saved": 18200000, "target": 28000000}],
-  "budgets": [{"category": "Food & Drinks", "limit_vnd": 600000, "over": 0, "pct": 80, "spent": 480000}]
+  "budgets": [{"category": "Food & Drinks", "limit_vnd": 600000, "over": 0, "pct": 80, "spent": 480000}],
+  "transactions": []
 };
 
+function getUserCustomTransactions() {
+  const saved = localStorage.getItem(USER_TXN_KEY);
+  if (saved) {
+    try { return JSON.parse(saved); } catch(e) { console.error(e); }
+  }
+  return [];
+}
+
+function getMergedDB() {
+  const userTxns = getUserCustomTransactions();
+  // Giữ nguyên SEED và hợp nhất thêm giao dịch mới của user
+  const mergedTxns = [...SEED.transactions, ...userTxns];
+  
+  // Tính toán lại số dư tài khoản từ SEED + User Txns
+  const mergedAccounts = SEED.accounts.map(acc => {
+    const delta = userTxns
+      .filter(t => t.account === acc.name)
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+    return { ...acc, balance: acc.balance + delta };
+  });
+
+  return { ...SEED, accounts: mergedAccounts, transactions: mergedTxns };
+}
+
+function computeKPI(db) {
+  const accounts = db.accounts || [];
+  const totalBalance = accounts.reduce((s, a) => s + (a.balance || 0), 0);
+  const txns = db.transactions || [];
+  const income = txns.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+  const expense = -txns.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0);
+  const savings_rate = income > 0 ? Math.round(((income - expense) / income) * 100) : 0;
+  return { balance: totalBalance, income, expense, savings_rate };
+}
+
 function fmtd(n){ return n.toLocaleString('vi-VN') + 'đ'; }
+
 function coach(q){
   q = (q || '').toLowerCase();
-  const k = SEED.kpi;
+  const db = getMergedDB();
+  const k = computeKPI(db);
   const has = arr => arr.some(w => q.indexOf(w) >= 0);
   if(has(['goal','mục tiêu','muc tieu','macbook','tiết kiệm','tiet kiem'])){
     return 'Bạn còn ' + fmtd(9800000) + ' nữa là đạt mục tiêu "MacBook Air M3". Với tốc độ tiết kiệm hiện tại, bạn cần khoảng 4 tháng nữa.';
@@ -184,15 +223,20 @@ function coach(q){
     return 'Tất cả ngân sách đang nằm trong tầm kiểm soát ngoại trừ Giải trí đã vượt giới hạn.';
   }
   if(has(['account','tài khoản','tai khoan','số dư','so du'])){
-    return 'Số dư hiện tại — Personal Wallet: 520.000đ, MB Bank: 1.450.000đ. Tổng: ' + fmtd(k.balance) + '.';
+    const accList = db.accounts.map(a => `${a.name}: ${fmtd(a.balance)}`).join(', ');
+    return 'Số dư hiện tại — ' + accList + '. Tổng: ' + fmtd(k.balance) + '.';
   }
   return 'Tháng này bạn thu ' + fmtd(k.income) + ', chi ' + fmtd(k.expense) + ', tỷ lệ tiết kiệm ' + k.savings_rate + '%.';
 }
 
 function reply(obj){ return Promise.resolve({ok: true, json: () => Promise.resolve(obj)}); }
+
 window.fetch = function(url, opts){
   opts = opts || {}; const body = opts.body ? JSON.parse(opts.body) : {};
-  if(url === '/api/state') return reply(SEED);
+  if(url === '/api/state') {
+    const db = getMergedDB();
+    return reply({ ...db, kpi: computeKPI(db) });
+  }
   if(url === '/api/coach') return reply({reply: coach(body.message)});
   return reply({});
 };
@@ -201,7 +245,7 @@ window.fetch = function(url, opts){
 const $ = s => document.querySelector(s);
 let S = null;
 const chat = [
-  {from:'ai', text:'Chào {{ user.username }}! Mình đã xem qua chi tiêu tháng 7 của bạn. Có vài điểm đáng chú ý đấy.'},
+  {from:'ai', text:'Chào {{ user.username }}! Mình đã xem qua chi tiêu của bạn. Có vài điểm đáng chú ý đấy.'},
   {from:'me', text:'Vậy mình nên tiết kiệm thế nào để mua MacBook nhanh hơn?'}
 ];
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -210,23 +254,26 @@ async function load(){
   const r = await fetch('/api/state'); S = await r.json(); render();
 }
 
+window.addEventListener('storage', (e) => {
+  if (e.key === USER_TXN_KEY) load();
+});
+
 function render(){
   if(!S) return;
   $('#uname').textContent = S.user.name; $('#uplan').textContent = S.user.plan; $('#avatar').textContent = S.user.initials;
   
   const NC = {warn:['#F59E0B','#FFFBEB'], ai:['#A78BFA','#F5F3FF'], done:['#34D399','#ECFDF5']};
-  const notes = S.notifications.map(n => `
+  const notes = (S.notifications || []).map(n => `
     <div class="note-item" style="--c:${NC[n.kind][0]};--b:${NC[n.kind][1]}">
       ${esc(n.text)}<small>${esc(n.ago)}</small></div>`).join('');
       
-  const prompts = ['&#128202; Tháng này tôi tiêu thế nào?','&#127919; Mục tiêu nào gần đạt nhất?','&#128176; Ngân sách nào sắp vượt?','&#127974; Số dư các tài khoản?']
+  const prompts = ['📊 Tháng này tôi tiêu thế nào?','🎯 Mục tiêu nào gần đạt nhất?','💰 Ngân sách nào sắp vượt?','🏦 Số dư các tài khoản?']
     .map(p => `<button class="qp" onclick="quick(this)">${p}</button>`).join('');
     
   const msgs = chat.map(m => `
     <div class="msg ${m.from==='me'?'me':'ai'}">
-      <div class="mini">${m.from==='me'?S.user.initials:'&#10024;'}</div>
+      <div class="mini">${m.from==='me'?S.user.initials:'✨'}</div>
       <div class="bubble">${esc(m.text)}</div></div>`).join('');
-
   $('#view').innerHTML = `<div class="chat-wrap">
     <div class="card chat">
       <div class="msgs" id="msgs">${msgs}</div>
@@ -243,7 +290,6 @@ function render(){
   
   const m = $('#msgs'); if(m) m.scrollTop = m.scrollHeight;
 }
-
 window.quick = b => { $('#chatInput').value = b.textContent.trim(); send(); };
 window.send = async () => {
   const inp = $('#chatInput'); const text = inp.value.trim(); if(!text) return;
@@ -252,11 +298,9 @@ window.send = async () => {
   const d = await r.json();
   chat.push({from:'ai', text:d.reply}); render();
 };
-
 document.addEventListener('keydown', e => {
   if(e.key === 'Enter' && document.activeElement && document.activeElement.id === 'chatInput') send();
 });
-
 load();
 </script>
 </body>

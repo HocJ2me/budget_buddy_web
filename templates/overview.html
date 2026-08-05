@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Budget Buddy 2.0 — Overview</title>
+<title>Budget Buddy — Overview</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -60,7 +60,6 @@ body{
   padding: 6px; border-radius: 8px; transition: 0.2s;
 }
 .logout-btn:hover{ color: var(--expense); background: #FEF2F2; }
-
 /* ---------- Main ---------- */
 .main{flex:1;min-width:0}
 .topbar{
@@ -134,7 +133,8 @@ tr.txn:hover{background:#F8FAFC}
 .ai-badge{background:#F3E8FF;color:#7C3AED;font-size:10.5px;padding:3px 8px;border-radius:6px;font-weight:700;margin-left:8px}
 .amt-pos{color:#059669;font-weight:800;text-align:right}
 .amt-neg{color:#DC2626;font-weight:800;text-align:right}
-/* ---------- Modal ---------- */
+
+/* ---------- Modal & Receipt Upload Zone ---------- */
 .overlay{position:fixed;inset:0;background:rgba(15,23,42,.42);backdrop-filter:blur(3px);display:none;place-items:center;z-index:50}
 .overlay.open{display:grid}
 .modal{background:var(--card);border-radius:20px;width:480px;max-width:94vw;max-height:92vh;overflow:auto;padding:28px}
@@ -152,6 +152,31 @@ tr.txn:hover{background:#F8FAFC}
   font-weight:700;font-size:14px;color:var(--muted);cursor:pointer;transition:.16s;
 }
 .toggle button.on{background:var(--card);color:var(--accent);box-shadow:var(--shadow)}
+
+/* Receipt Upload UI - Matched with transactions.html & budgets.html */
+.upload-zone{
+  border:2px dashed var(--border); border-radius:14px; padding:18px; text-align:center;
+  background:#F8FAFC; cursor:pointer; transition:.2s; position:relative; overflow:hidden;
+}
+.upload-zone:hover, .upload-zone.dragover{ border-color:var(--accent); background:rgba(13,148,136,.04); }
+.upload-zone input[type="file"]{ position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+.upload-icon{ font-size:26px; margin-bottom:6px; display:block; }
+.upload-text{ font-size:13px; font-weight:600; color:var(--text); }
+.upload-hint{ font-size:11.5px; color:var(--muted); margin-top:2px; }
+.preview-box{
+  display:none; align-items:center; gap:12px; background:#F1F5F9; border-radius:12px;
+  padding:10px 14px; margin-top:10px; position:relative;
+}
+.preview-box img{ width:44px; height:44px; border-radius:8px; object-fit:cover; border:1px solid var(--border); }
+.preview-info{ flex:1; min-width:0; text-align:left; }
+.preview-info .filename{ font-size:13px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.preview-info .filesize{ font-size:11px; color:var(--muted); }
+.remove-btn{
+  background:none; border:none; color:var(--expense); font-size:18px; font-weight:bold;
+  cursor:pointer; padding:4px 8px; border-radius:6px; transition:.15s;
+}
+.remove-btn:hover{ background:#FEE2E2; }
+
 .preview{background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:13px 15px;font-size:13.5px;font-weight:600;margin-bottom:15px}
 .err{color:var(--expense);font-size:13px;font-weight:600;margin-bottom:12px;min-height:18px}
 .row2{display:flex;gap:10px}
@@ -169,7 +194,7 @@ canvas{max-width:100%}
   <aside class="sidebar">
     <div class="brand">
       <div class="logo">&#128176;</div>
-      <div><h1>Budget Buddy</h1><span>2.0 &middot; Smart Finance</span></div>
+      <div><h1>Budget Buddy</h1><span> &middot; Smart Finance</span></div>
     </div>
     <nav class="nav" id="nav">
       <button data-tab="overview" class="active">&#127968; <span class="lbl">Overview</span></button>
@@ -188,7 +213,7 @@ canvas{max-width:100%}
       </div>
       <a href="/logout" title="Đăng xuất" class="logout-btn">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 2 0 0 1 2-2h4"></path>
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
           <polyline points="16 17 21 12 16 7"></polyline>
           <line x1="21" y1="12" x2="9" y2="12"></line>
         </svg>
@@ -205,10 +230,9 @@ canvas{max-width:100%}
     </header>
     <div class="content" id="view"></div>
   </main>
-  
 </div>
 
-<!-- Modal Thêm Giao Dịch -->
+<!-- Modal Thêm Giao Dịch Đồng Bộ Giao Diện Upload -->
 <div class="overlay" id="overlay">
   <div class="modal">
     <h3>Add Transaction</h3>
@@ -216,6 +240,26 @@ canvas{max-width:100%}
       <button id="tExp" class="on">Expense</button>
       <button id="tInc">Income</button>
     </div>
+    
+    <!-- Upload hóa đơn UI dạng Drag & Drop -->
+    <div class="field">
+      <label>Hóa đơn đính kèm (Receipt)</label>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fReceipt" accept="image/*">
+        <span class="upload-icon">&#129302;</span>
+        <div class="upload-text">Kéo thả hoặc click để tải hóa đơn</div>
+        <div class="upload-hint">Tự động nhận diện thông tin bằng AI (JPG, PNG)</div>
+      </div>
+      <div class="preview-box" id="previewBox">
+        <img id="receiptImg" src="" alt="Receipt Preview">
+        <div class="preview-info">
+          <div class="filename" id="receiptFileName">receipt.jpg</div>
+          <div class="filesize" id="receiptFileSize">0 KB</div>
+        </div>
+        <button type="button" class="remove-btn" id="removeReceiptBtn" title="Xóa ảnh">&times;</button>
+      </div>
+    </div>
+
     <div class="field"><label>Merchant / Mô tả</label><input id="fMerchant" placeholder="VD: Highlands Coffee"></div>
     <div class="row2">
       <div class="field"><label>Amount (&#8363;)</label><input id="fAmount" type="number" min="0" step="1000" placeholder="45000"></div>
@@ -223,6 +267,7 @@ canvas{max-width:100%}
     </div>
     <div class="field"><label>Category</label><select id="fCat"></select></div>
     <div class="field"><label>Paid via / Account</label><select id="fAcc"></select></div>
+    
     <div class="preview" id="preview"></div>
     <div class="err" id="err"></div>
     <div class="row2">
@@ -246,8 +291,8 @@ const DB = {
   notifications: SEED.notifications.map(n => ({...n})),
   limits: SEED.budgets.map(b => ({category_id:b.category_id, limit_vnd:b.limit_vnd})),
 };
-
 let nextId = Math.max.apply(null, DB.transactions.map(t => t.id)) + 1;
+let currentReceiptBase64 = null;
 
 function buildState(){
   const P = DB.period;
@@ -285,32 +330,22 @@ function reply(obj, ok){
   return Promise.resolve({ok: ok !== false, json: () => Promise.resolve(obj)});
 }
 
-// 1. Lưu lại hàm fetch nguyên bản của trình duyệt
 const nativeFetch = window.fetch;
-
 window.fetch = async function(url, opts){
   opts = opts || {};
   const body = opts.body ? JSON.parse(opts.body) : {};
-
-  // Giữ nguyên API lấy state giao diện từ SEED/DB trong RAM
   if(url === '/api/state') return reply(buildState());
-
-  // Khi bấm Thêm Giao Dịch
   if(url === '/api/transactions' && opts.method === 'POST'){
     const merchant = (body.merchant || '').trim();
     const amount = Math.round(Number(body.amount));
-
     if(!merchant) return reply({error:'Vui lòng nhập tên giao dịch'}, false);
     if(!(amount > 0)) return reply({error:'Số tiền phải lớn hơn 0'}, false);
-
     const acc = DB.accounts.find(a => a.id === body.account_id);
     const cat = DB.categories.find(c => c.id === body.category_id);
     if(!acc || !cat) return reply({error:'Thiếu danh mục hoặc tài khoản'}, false);
-
     const signed = body.type === 'income' ? amount : -amount;
     if(acc.balance + signed < 0) return reply({error:'Số dư ' + acc.name + ' không đủ'}, false);
 
-    // Update giao diện tạm thời trong RAM
     acc.balance += signed;
     const newTxn = {
       id: nextId++,
@@ -319,17 +354,17 @@ window.fetch = async function(url, opts){
       date: body.date || DB.period + '-28',
       category_id: cat.id,
       account_id: acc.id,
-      ai_tagged: 0,
+      ai_tagged: body.image ? 1 : 0,
       category: cat.name,
       cat_icon: cat.icon,
       color: cat.color,
       bg: cat.bg,
       account: acc.name,
-      acc_icon: acc.icon
+      acc_icon: acc.icon,
+      image: body.image || null
     };
     DB.transactions.push(newTxn);
 
-    // 2. GỬI DỮ LIỆU THẬT VỀ FLASK DB (Background)
     try {
       await nativeFetch('/api/transactions', {
         method: 'POST',
@@ -340,22 +375,20 @@ window.fetch = async function(url, opts){
           category: cat.name,
           account: acc.name,
           date: body.date,
-          type: body.type
+          type: body.type,
+          image: body.image || null
         })
       });
     } catch(err) {
       console.warn("Không thể đồng bộ với Flask Database:", err);
     }
-
     return reply(buildState());
   }
-
   return reply({error:'404'}, false);
 };
 
 const $ = s => document.querySelector(s);
 let S = null, txnType = 'expense', charts = [];
-
 const fmtVND = n => {
   const a = Math.abs(n);
   if (a >= 1e9) return (n/1e9).toFixed(1).replace('.0','') + 'B';
@@ -370,31 +403,20 @@ const esc   = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>
 
 async function load(){
   try {
-    // 1. Kéo dữ liệu từ Flask DB
     const res = await nativeFetch('/api/transactions');
     if (res.ok) {
       const dbTxns = await res.json();
       if (Array.isArray(dbTxns) && dbTxns.length > 0) {
-        
-        // 2. Map dữ liệu linh hoạt (ưu tiên t.merchant, nếu ko có lấy t.note)
         const realMapped = dbTxns.map((t, idx) => {
-          // Lấy đúng tên merchant
           const merchantName = t.merchant || t.note || 'Giao dịch';
-
-          // Tìm Category
           const cat = DB.categories.find(c => 
             c.name.toLowerCase() === (t.category || '').toLowerCase()
           ) || DB.categories[0];
-
-          // Tìm Account
           const acc = DB.accounts.find(a => 
             a.name.toLowerCase() === (t.account || '').toLowerCase()
           ) || DB.accounts[0];
-
-          // Xử lý dấu âm/dương cho số tiền
           let amt = Number(t.amount) || 0;
           if (t.type === 'expense' && amt > 0) amt = -amt;
-
           return {
             id: 999000 + (t.id || idx),
             merchant: merchantName,
@@ -408,19 +430,16 @@ async function load(){
             color: cat.color,
             bg: cat.bg,
             account: acc.name,
-            acc_icon: acc.icon
+            acc_icon: acc.icon,
+            image: t.image || null
           };
         });
-
-        // 3. Gộp dữ liệu thật lên trên dữ liệu mẫu SEED
         DB.transactions = [...realMapped, ...SEED.transactions];
       }
     }
   } catch(e) {
     console.warn("Dùng SEED mặc định:", e);
   }
-
-  // Render lại giao diện
   const r = await fetch('/api/state');
   S = await r.json();
   render();
@@ -458,7 +477,8 @@ function vOverview(){
   const over = S.budgets.filter(b => b.over > 0);
   const alert = over.length ? `
     <div class="alert">&#9888;&#65039; <span>Ngân sách <b>${esc(over[0].category)}</b> đã vượt — quá <b>${full(over[0].over)}</b></span>
-    <button class="btn" onclick="alert('Xem ngân sách')">Review &rarr;</button></div>` : ''; 
+    <button class="btn" onclick="window.location.href='/budgets'">Review &rarr;</button></div>` : ''; 
+    
   const kpis = [
     ['BALANCE','&#128176;','#0D9488','#CCFBF1', money(k.balance), 'Across all accounts'],
     ['INCOME','&#128184;','#34D399','#D1FAE5', money(k.income), 'Scholarship + tutoring'],
@@ -528,19 +548,13 @@ function after(){
   }
 }
 
-async function post(url, body){
-  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body||{})});
-  const d = await r.json();
-  if(!r.ok) throw new Error(d.error || 'Lỗi');
-  return d;
-}
-
 function fillSelects(){
   const cats = S.categories.filter(c => c.kind === txnType);
   $('#fCat').innerHTML = cats.map(c => `<option value="${c.id}">${c.icon} ${esc(c.name)}</option>`).join('');
   $('#fAcc').innerHTML = S.accounts.map(a => `<option value="${a.id}">${a.icon} ${esc(a.name)} — ${full(a.balance)}</option>`).join('');
   updatePreview();
 }
+
 function updatePreview(){
   const acc = S.accounts.find(a => a.id == $('#fAcc').value);
   const amt = parseInt($('#fAmount').value || 0, 10);
@@ -550,11 +564,76 @@ function updatePreview(){
     `<b style="color:${after < 0 ? '#DC2626' : '#059669'}">${full(after)}</b>` +
     (after < 0 ? ' &nbsp;&#9888;&#65039; không đủ số dư' : '');
 }
+
+/* ---------- Xử lý Upload Hóa Đơn (Đồng bộ với Transactions/Budgets) ---------- */
+function setupReceiptUpload(){
+  const fileInput = $('#fReceipt');
+  const uploadZone = $('#uploadZone');
+  const previewBox = $('#previewBox');
+  const receiptImg = $('#receiptImg');
+  const fileName = $('#receiptFileName');
+  const fileSize = $('#receiptFileSize');
+  const removeBtn = $('#removeReceiptBtn');
+
+  uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+  uploadZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    if(e.dataTransfer.files && e.dataTransfer.files[0]) {
+      fileInput.files = e.dataTransfer.files;
+      handleFile(fileInput.files[0]);
+    }
+  });
+
+  fileInput.addEventListener('change', () => {
+    if(fileInput.files && fileInput.files[0]) {
+      handleFile(fileInput.files[0]);
+    }
+  });
+
+  removeBtn.addEventListener('click', clearReceipt);
+
+  function handleFile(file){
+    if(!file.type.startsWith('image/')) {
+      alert('Vui lòng chọn file hình ảnh!');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      currentReceiptBase64 = e.target.result;
+      receiptImg.src = currentReceiptBase64;
+      fileName.textContent = file.name;
+      fileSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
+      uploadZone.style.display = 'none';
+      previewBox.style.display = 'flex';
+      
+      // Auto-fill giả lập bằng AI đồng bộ với các trang khác
+      if(!$('#fMerchant').value) $('#fMerchant').value = "Highlands Coffee";
+      if(!$('#fAmount').value) $('#fAmount').value = 45000;
+      updatePreview();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearReceipt(){
+    fileInput.value = '';
+    currentReceiptBase64 = null;
+    uploadZone.style.display = 'block';
+    previewBox.style.display = 'none';
+    receiptImg.src = '';
+  }
+}
+
 function openModal(){
   $('#fDate').value = S.period + '-' + String(new Date().getDate()).padStart(2,'0');
   $('#fMerchant').value = ''; $('#fAmount').value = ''; $('#err').textContent = '';
+  $('#fReceipt').value = ''; currentReceiptBase64 = null;
+  $('#uploadZone').style.display = 'block';
+  $('#previewBox').style.display = 'none';
   setType('expense'); $('#overlay').classList.add('open'); $('#fMerchant').focus();
 }
+
 function closeModal(){ $('#overlay').classList.remove('open'); }
 function setType(t){
   txnType = t;
@@ -570,45 +649,40 @@ $('#tInc').onclick = () => setType('income');
 $('#fAcc').onchange = updatePreview;
 $('#fAmount').oninput = updatePreview;
 $('#overlay').onclick = e => { if(e.target === $('#overlay')) closeModal(); };
+
 $('#saveBtn').onclick = async () => {
   $('#err').textContent = '';
   
-  // 1. Lấy dữ liệu chính xác từ các ô Input theo ID trong file của bạn
   const merchantVal = $('#fMerchant').value.trim();
   const amountVal   = parseFloat($('#fAmount').value) || 0;
   const dateVal     = $('#fDate').value;
   const catId       = parseInt($('#fCat').value, 10);
   const accId       = parseInt($('#fAcc').value, 10);
-
-  // Tìm tên danh mục và tài khoản tương ứng
+  
   const catObj = S.categories.find(c => c.id === catId);
   const accObj = S.accounts.find(a => a.id === accId);
-
-  // 2. Đóng gói thông tin gửi về Backend Flask
+  
   const payload = {
     merchant: merchantVal,
     amount: amountVal,
     date: dateVal,
-    type: txnType, // 'expense' hoặc 'income'
+    type: txnType,
     category_id: catId,
     account_id: accId,
     category: catObj ? catObj.name : 'Other',
-    account: accObj ? accObj.name : 'Personal Wallet'
+    account: accObj ? accObj.name : 'Personal Wallet',
+    image: currentReceiptBase64
   };
 
   try {
-    // 3. Gửi Request POST thực sự về API Flask
     const response = await fetch('/api/transactions', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-
     if (response.ok) {
       closeModal();
-      await load(); // Tải lại toàn bộ dữ liệu từ DB để giao diện cập nhật chuẩn nhất
+      await load();
     } else {
       const errData = await response.json();
       $('#err').textContent = errData.error || errData.message || 'Không thể lưu giao dịch!';
@@ -619,8 +693,8 @@ $('#saveBtn').onclick = async () => {
   }
 };
 
+setupReceiptUpload();
 load();
 </script>
-
 </body>
 </html>

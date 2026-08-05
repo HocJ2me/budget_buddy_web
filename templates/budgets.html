@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Budget Buddy 2.0 — Budgets</title>
+<title>Budget Buddy — Budgets</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -21,7 +21,6 @@ body{
   background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased;
 }
 .app{display:flex;min-height:100vh}
-
 /* ---------- Sidebar ---------- */
 .sidebar{
   width:250px;background:var(--card);border-right:1px solid var(--border);
@@ -61,7 +60,6 @@ body{
   padding: 6px; border-radius: 8px; transition: 0.2s;
 }
 .logout-btn:hover{ color: var(--expense); background: #FEF2F2; }
-
 /* ---------- Main ---------- */
 .main{flex:1;min-width:0}
 .topbar{
@@ -86,7 +84,6 @@ body{
 .btn.ghost{background:#fff;color:var(--text);border:1px solid var(--border);box-shadow:none}
 .btn.ghost:hover{border-color:var(--accent);color:var(--accent)}
 .content{padding:26px 32px 60px;display:flex;flex-direction:column;gap:20px}
-
 /* ---------- Cards ---------- */
 .card{
   background:var(--card);border:1px solid var(--border);border-radius:var(--r);
@@ -98,7 +95,6 @@ body{
 .g3{grid-template-columns:repeat(3,1fr)}
 .g2{grid-template-columns:1.15fr .85fr}
 .tile{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:19px;flex:none}
-
 /* ---------- Budgets ---------- */
 .bud{padding:14px 0;border-bottom:1px solid #F1F5F9}
 .bud:last-child{border-bottom:0}
@@ -109,7 +105,6 @@ body{
 .bar i{display:block;height:100%;border-radius:99px;transition:width .8s cubic-bezier(.4,0,.2,1)}
 .over-txt{color:var(--expense);font-size:12.5px;font-weight:600;margin-top:7px}
 .badge{display:inline-block;padding:5px 12px;border-radius:999px;font-size:12px;font-weight:700;}
-
 /* ---------- Modal ---------- */
 .overlay{position:fixed;inset:0;background:rgba(15,23,42,.42);backdrop-filter:blur(3px);display:none;place-items:center;z-index:50}
 .overlay.open{display:grid}
@@ -133,13 +128,80 @@ body{
 .row2{display:flex;gap:10px}
 .row2>*{flex:1}
 
+/* Receipt Upload UI - Đồng bộ Overview */
+.upload-zone {
+  border: 2px dashed var(--border);
+  border-radius: 14px;
+  padding: 18px;
+  text-align: center;
+  background: #F8FAFC;
+  cursor: pointer;
+  transition: 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.upload-zone:hover, .upload-zone.dragover {
+  border-color: var(--accent);
+  background: rgba(13,148,136,.04);
+}
+.upload-zone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+.upload-icon { font-size: 26px; margin-bottom: 6px; display: block; }
+.upload-text { font-size: 13px; font-weight: 600; color: var(--text); }
+.upload-hint { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+
+.preview-box {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  background: #F1F5F9;
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-top: 10px;
+  position: relative;
+}
+.preview-box img {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+}
+.preview-info { flex: 1; min-width: 0; text-align: left; }
+.preview-info .filename {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.preview-info .filesize { font-size: 11px; color: var(--muted); }
+.remove-btn {
+  background: none;
+  border: none;
+  color: var(--expense);
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: 0.15s;
+}
+.remove-btn:hover { background: #FEE2E2; }
+
 /* ---------- Email Notification Banner Modal ---------- */
 .email-card{
   background:#FFF;border:1px solid var(--border);border-radius:16px;padding:20px;box-shadow:0 10px 25px rgba(0,0,0,0.1);
 }
 .email-header{display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:14px;}
 .email-header .mail-icon{font-size:24px;background:#FEF2F2;width:40px;height:40px;border-radius:10px;display:grid;place-items:center;}
-
 canvas{max-width:100%}
 @media(max-width:1000px){
   .g3{grid-template-columns:repeat(2,1fr)}
@@ -153,7 +215,7 @@ canvas{max-width:100%}
   <aside class="sidebar">
     <div class="brand">
       <div class="logo">&#128176;</div>
-      <div><h1>Budget Buddy</h1><span>2.0 &middot; Smart Finance</span></div>
+      <div><h1>Budget Buddy</h1><span> &middot; Smart Finance</span></div>
     </div>
     <nav class="nav">
       <a href="/">&#127968; <span class="lbl">Overview</span></a>
@@ -199,6 +261,26 @@ canvas{max-width:100%}
       <button id="tExp" class="on">Expense</button>
       <button id="tInc">Income</button>
     </div>
+    
+    <!-- UI Upload Hóa Đơn Đồng Bộ -->
+    <div class="field">
+      <label>Hóa đơn đính kèm (Receipt)</label>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fReceipt" accept="image/*">
+        <span class="upload-icon">&#129302;</span>
+        <div class="upload-text">Kéo thả hoặc click để tải hóa đơn</div>
+        <div class="upload-hint">Tự động nhận diện thông tin bằng AI (JPG, PNG)</div>
+      </div>
+      <div class="preview-box" id="previewBox">
+        <img id="receiptImg" src="" alt="Receipt Preview">
+        <div class="preview-info">
+          <div class="filename" id="receiptFileName">receipt.jpg</div>
+          <div class="filesize" id="receiptFileSize">0 KB</div>
+        </div>
+        <button type="button" class="remove-btn" id="removeReceiptBtn" title="Xóa ảnh">&times;</button>
+      </div>
+    </div>
+
     <div class="field"><label>Merchant / Description</label><input id="fMerchant" placeholder="e.g. Highlands Coffee"></div>
     <div class="row2">
       <div class="field"><label>Amount (&#8363;)</label><input id="fAmount" type="number" min="0" step="1000" placeholder="45000"></div>
@@ -241,16 +323,13 @@ const getCurrentPeriod = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
-
 const getPeriodLabel = (periodStr) => {
   const [year, month] = periodStr.split('-');
   const date = new Date(year, month - 1);
   return date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 };
-
 /* ===== Mock Storage & Data ===== */
 const currentPeriod = getCurrentPeriod();
-
 const SEED = {
   "accounts": [
     {"balance": 520000, "icon": "💵", "id": 1, "name": "Personal Wallet", "type": "cash"}, 
@@ -283,7 +362,6 @@ const SEED = {
   ], 
   "user": {"initials": "{{ user.username[0].upper() }}", "name": "{{ user.username }}", "plan": "Student"}
 };
-
 function loadDBFromStorage() {
   const saved = localStorage.getItem('budget_buddy_db');
   if (saved) {
@@ -298,14 +376,11 @@ function loadDBFromStorage() {
     limits: SEED.budgets.map(b => ({category_id:b.category_id, limit_vnd:b.limit_vnd}))
   };
 }
-
 function saveDBToStorage(db) {
   localStorage.setItem('budget_buddy_db', JSON.stringify(db));
 }
-
 const DB = loadDBFromStorage();
 let nextId = DB.transactions.length > 0 ? Math.max(...DB.transactions.map(t => t.id), 0) + 1 : 100;
-
 function buildState(){
   const P = DB.period;
   const m = DB.transactions.filter(t => t.date.indexOf(P) === 0);
@@ -326,7 +401,6 @@ function buildState(){
       over: Math.max(0, spent - l.limit_vnd)
     };
   });
-
   const weekly = [0, 0, 0, 0];
   m.forEach(t => {
     if(t.amount < 0){
@@ -337,12 +411,9 @@ function buildState(){
       else weekly[3] += Math.abs(t.amount);
     }
   });
-
   return {period: P, user: DB.user, accounts: DB.accounts, categories: DB.categories, budgets: budgets, charts: {weekly: weekly}};
 }
-
 function reply(obj, ok){ return Promise.resolve({ok: ok !== false, json: () => Promise.resolve(obj)}); }
-
 window.fetch = function(url, opts){
   opts = opts || {}; const body = opts.body ? JSON.parse(opts.body) : {};
   if(url === '/api/state') return reply(buildState());
@@ -368,9 +439,7 @@ window.fetch = function(url, opts){
       account: acc.name, 
       acc_icon: acc.icon
     });
-
     saveDBToStorage(DB);
-
     // Check if this transaction causes budget breach
     const newState = buildState();
     const targetBudget = newState.budgets.find(b => b.category_id === cat.id);
@@ -384,15 +453,13 @@ window.fetch = function(url, opts){
         over: targetBudget.over
       };
     }
-
     return reply({ state: newState, breachAlert: breachAlert });
   }
   return reply({error:'404'}, false);
 };
-
 /* ===== UI Script ===== */
 const $ = s => document.querySelector(s);
-let S = null, txnType = 'expense', charts = [];
+let S = null, txnType = 'expense', charts = [], currentReceiptBase64 = null;
 const fmtVND = n => { const a = Math.abs(n); return a >= 1e6 ? (n/1e6).toFixed(1).replace('.0','') + 'M' : Math.round(n/1e3) + 'K'; };
 const money = n => fmtVND(n) + ' ₫';
 const full  = n => n.toLocaleString('en-US') + ' ₫';
@@ -400,6 +467,75 @@ const esc   = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>
 
 async function load(){
   const r = await fetch('/api/state'); S = await r.json(); render();
+  setupReceiptUpload();
+}
+
+function setupReceiptUpload(){
+  const fileInput = $('#fReceipt');
+  const uploadZone = $('#uploadZone');
+  const previewBox = $('#previewBox');
+  const receiptImg = $('#receiptImg');
+  const fileName = $('#receiptFileName');
+  const fileSize = $('#receiptFileSize');
+  const removeBtn = $('#removeReceiptBtn');
+
+  if(!fileInput || !uploadZone) return;
+
+  uploadZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadZone.classList.add('dragover');
+  });
+  
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+  
+  uploadZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    if(e.dataTransfer.files && e.dataTransfer.files[0]) {
+      fileInput.files = e.dataTransfer.files;
+      handleFile(fileInput.files[0]);
+    }
+  });
+
+  fileInput.addEventListener('change', () => {
+    if(fileInput.files && fileInput.files[0]) {
+      handleFile(fileInput.files[0]);
+    }
+  });
+
+  removeBtn.addEventListener('click', clearReceipt);
+
+  function handleFile(file){
+    if(!file.type.startsWith('image/')) {
+      alert('Vui lòng chọn file hình ảnh!');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      currentReceiptBase64 = e.target.result;
+      receiptImg.src = currentReceiptBase64;
+      fileName.textContent = file.name;
+      fileSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
+      uploadZone.style.display = 'none';
+      previewBox.style.display = 'flex';
+      
+      // Auto-fill gợi ý
+      if(!$('#fMerchant').value) $('#fMerchant').value = "Highlands Coffee";
+      if(!$('#fAmount').value) {
+        $('#fAmount').value = 45000;
+        updatePreview();
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearReceipt(){
+    fileInput.value = '';
+    currentReceiptBase64 = null;
+    uploadZone.style.display = 'block';
+    previewBox.style.display = 'none';
+    receiptImg.src = '';
+  }
 }
 
 function render(){
@@ -487,11 +623,14 @@ function openModal(){
   const dateStr = `${S.period}-${String(today.getDate()).padStart(2,'0')}`;
   $('#fDate').value = dateStr;
   $('#fMerchant').value = ''; $('#fAmount').value = ''; $('#err').textContent = '';
+  
+  // Reset Upload UI
+  if($('#removeReceiptBtn')) $('#removeReceiptBtn').click();
+
   setType('expense'); $('#overlay').classList.add('open'); $('#fMerchant').focus();
 }
 function closeModal(){ $('#overlay').classList.remove('open'); }
 function closeEmailModal(){ $('#emailOverlay').classList.remove('open'); }
-
 function setType(t){
   txnType = t; $('#tExp').classList.toggle('on', t === 'expense'); $('#tInc').classList.toggle('on', t === 'income');
   const cats = S.categories.filter(c => c.kind === txnType);
@@ -499,7 +638,6 @@ function setType(t){
   $('#fAcc').innerHTML = S.accounts.map(a => `<option value="${a.id}">${a.icon} ${esc(a.name)} — ${full(a.balance)}</option>`).join('');
   updatePreview();
 }
-
 function updatePreview(){
   const acc = S.accounts.find(a => a.id == $('#fAcc').value);
   const amt = parseInt($('#fAmount').value || 0, 10);
@@ -516,7 +654,6 @@ $('#fAcc').onchange = updatePreview;
 $('#fAmount').oninput = updatePreview;
 $('#overlay').onclick = e => { if(e.target === $('#overlay')) closeModal(); };
 $('#emailOverlay').onclick = e => { if(e.target === $('#emailOverlay')) closeEmailModal(); };
-
 $('#saveBtn').onclick = async () => {
   try{
     const r = await fetch('/api/transactions', {
@@ -535,7 +672,6 @@ $('#saveBtn').onclick = async () => {
     S = res.state; 
     closeModal(); 
     render();
-
     // Trigger Email Notification Modal if budget is exceeded
     if(res.breachAlert) {
       const b = res.breachAlert;
@@ -544,7 +680,6 @@ $('#saveBtn').onclick = async () => {
     }
   }catch(e){ $('#err').textContent = e.message; }
 };
-
 load();
 </script>
 </body>

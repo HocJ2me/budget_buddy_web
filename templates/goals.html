@@ -190,12 +190,15 @@ body{
 
   <main class="main">
     <header class="topbar">
-      <div><h2>Goals</h2><p>Track your saving milestones</p></div>
-      <div style="display:flex;gap:12px;align-items:center">
-        <div class="synced"><i class="pulse"></i> Synced</div>
-        <button class="btn" id="openModal">+ New Goal</button>
-      </div>
-    </header>
+  <div>
+    <h2>Goals</h2>
+    <p>Track your saving milestones</p>
+  </div>
+  <div style="display:flex;gap:12px;align-items:center">
+    <div class="synced"><i class="pulse"></i> Synced</div>
+    <button class="btn" id="openModal">+ New Goal</button>
+  </div>
+</header>
     <div class="content" id="view"></div>
   </main>
 </div>
@@ -266,7 +269,10 @@ body{
 </div>
 
 <script>
-/* ===== Initial Seed & Storage Logic ===== */
+/* ===== Dynamic Account & Data Key Setup ===== */
+const CURRENT_USER = "{{ user.username }}".replace(/[{}]/g, '').trim() || 'default_user';
+const STORAGE_KEY = `budget_buddy_db_${CURRENT_USER}`;
+
 const SEED = {
   "goals": [
     {"accent": "#0D9488", "deadline": "Dec 2026", "icon": "💻", "id": 1, "name": "MacBook Air M3", "saved": 18200000, "target": 28000000},
@@ -274,11 +280,11 @@ const SEED = {
     {"accent": "#34D399", "deadline": "Done!", "icon": "🛡️", "id": 3, "name": "Emergency Fund", "saved": 10000000, "target": 10000000}
   ],
   "kpi": {"income": 4000000, "expense": 1191000},
-  "user": {"initials": "{{ user.username[0].upper() }}", "name": "{{ user.username }}", "plan": "Student"}
+  "user": {"initials": CURRENT_USER[0] ? CURRENT_USER[0].toUpperCase() : 'U', "name": CURRENT_USER, "plan": "Student"}
 };
 
 function loadStateFromStorage() {
-  const saved = localStorage.getItem('budget_buddy_goals_db');
+  const saved = localStorage.getItem(STORAGE_KEY);
   if (saved) {
     try { return JSON.parse(saved); } catch(e) { console.error(e); }
   }
@@ -286,7 +292,7 @@ function loadStateFromStorage() {
 }
 
 function saveStateToStorage(state) {
-  localStorage.setItem('budget_buddy_goals_db', JSON.stringify(state));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
 const DB = loadStateFromStorage();
