@@ -68,6 +68,8 @@ EMAIL_FROM=Budget Buddy <notifications@ten-mien-da-xac-minh.com>
 
 Để gửi báo cáo tuần trên Render, tạo **Cron Job** dùng cùng repository và các biến môi trường với Web Service:
 
+Web Service và Cron Job bắt buộc dùng cùng biến `DATABASE_URL` trỏ tới một PostgreSQL dùng chung. Không dùng SQLite mặc định cho bản triển khai này vì hai dịch vụ không chia sẻ cùng tệp database.
+
 ```text
 Build Command: pip install -r requirements.txt
 Command: flask --app app send-weekly-reports
