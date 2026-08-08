@@ -109,6 +109,65 @@ class BudgetBuddyIntegrationTest(unittest.TestCase):
         self.assertEqual(ocr.status_code, 503)
         self.assertIn("OPENAI_API_KEY", ocr.get_json()["error"])
 
+    def test_balance_edit_persists_preserves_history_and_is_user_scoped(self):
+        self.signup("erin", "erin@example.com")
+        state = self.client.get("/api/state?period=2026-08").get_json()
+        wallet = next(a for a in state["accounts"] if a["name"] == "Personal Wallet")
+        food = next(c for c in state["categories"] if c["name"] == "Food & Drinks")
+
+        created = self.client.post(
+            "/api/transactions",
+            json={
+                "merchant": "Lunch",
+                "amount": 20_000,
+                "date": "2026-08-08",
+                "type": "expense",
+                "account_id": wallet["id"],
+                "category_id": food["id"],
+            },
+        )
+        self.assertEqual(created.status_code, 201)
+
+        updated = self.client.patch(
+            f'/api/accounts/{wallet["id"]}/balance',
+            json={"balance": 750_000, "period": "2026-08"},
+        )
+        self.assertEqual(updated.status_code, 200)
+        updated_state = updated.get_json()["state"]
+        updated_wallet = next(a for a in updated_state["accounts"] if a["id"] == wallet["id"])
+        self.assertEqual(updated_wallet["balance"], 750_000)
+        self.assertEqual(updated_state["kpi"]["balance"], 3_030_000)
+        self.assertEqual(len(updated_state["transactions"]), 1)
+
+        another_expense = self.client.post(
+            "/api/transactions",
+            json={
+                "merchant": "Dinner",
+                "amount": 50_000,
+                "date": "2026-08-09",
+                "type": "expense",
+                "account_id": wallet["id"],
+                "category_id": food["id"],
+            },
+        )
+        self.assertEqual(another_expense.status_code, 201)
+        refreshed = self.client.get("/api/state?period=2026-08").get_json()
+        refreshed_wallet = next(a for a in refreshed["accounts"] if a["id"] == wallet["id"])
+        self.assertEqual(refreshed_wallet["balance"], 700_000)
+        self.assertEqual(len(refreshed["transactions"]), 2)
+
+        self.client.get("/logout")
+        self.signup("frank", "frank@example.com")
+        frank_state = self.client.get("/api/state?period=2026-08").get_json()
+        frank_wallet = next(a for a in frank_state["accounts"] if a["name"] == "Personal Wallet")
+        self.assertEqual(frank_wallet["balance"], 520_000)
+        self.assertEqual(frank_state["kpi"]["balance"], 2_800_000)
+        self.assertEqual(frank_state["transactions"], [])
+        forbidden = self.client.patch(
+            f'/api/accounts/{wallet["id"]}/balance', json={"balance": 1_000_000}
+        )
+        self.assertEqual(forbidden.status_code, 404)
+
     def test_goals_and_receipt_ocr_response_shape(self):
         self.signup("dana", "dana@example.com")
         created = self.client.post(

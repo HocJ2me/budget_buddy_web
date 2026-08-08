@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import json
+import math
 import os
 import re
 from datetime import UTC, date, datetime
@@ -255,13 +256,16 @@ def valid_period(value):
     return date.today().strftime("%Y-%m")
 
 
-def account_balance(account):
-    delta = (
+def account_transaction_delta(account):
+    return float(
         db.session.query(db.func.coalesce(db.func.sum(Transaction.amount), 0))
         .filter_by(user_id=account.user_id, account_id=account.id)
         .scalar()
     )
-    return float(account.opening_balance + delta)
+
+
+def account_balance(account):
+    return float(account.opening_balance + account_transaction_delta(account))
 
 
 def serialize_transaction(tx):
@@ -517,6 +521,32 @@ def ai_coach():
 @login_required
 def get_state():
     return jsonify(build_state(current_user, request.args.get("period")))
+
+
+@app.route("/api/accounts/<int:account_id>/balance", methods=["PATCH"])
+@login_required
+def update_account_balance(account_id):
+    data = request.get_json(silent=True) or {}
+    try:
+        raw_balance = float(data.get("balance"))
+    except (TypeError, ValueError):
+        return json_error("Số dư không hợp lệ.")
+    if not math.isfinite(raw_balance) or raw_balance < 0:
+        return json_error("Số dư phải là số không âm.")
+    target_balance = round(raw_balance)
+
+    account = Account.query.filter_by(id=account_id, user_id=current_user.id).first()
+    if not account:
+        return json_error("Không tìm thấy tài khoản.", 404)
+
+    # Preserve the complete transaction history. The opening balance is adjusted
+    # so opening balance + all transaction deltas equals the requested balance.
+    account.opening_balance = target_balance - account_transaction_delta(account)
+    db.session.commit()
+    return jsonify({
+        "success": True,
+        "state": build_state(current_user, data.get("period")),
+    })
 
 
 @app.route("/api/transactions", methods=["GET"])
