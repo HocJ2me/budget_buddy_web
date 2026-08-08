@@ -245,7 +245,7 @@ canvas{max-width:100%}
     <div class="field">
       <label>Hóa đơn đính kèm (Receipt)</label>
       <div class="upload-zone" id="uploadZone">
-        <input type="file" id="fReceipt" accept="image/*">
+        <input type="file" id="fReceipt" accept="image/jpeg,image/png,image/webp" capture="environment">
         <span class="upload-icon">&#129302;</span>
         <div class="upload-text">Kéo thả hoặc click để tải hóa đơn</div>
         <div class="upload-hint">Tự động nhận diện thông tin bằng AI (JPG, PNG)</div>
@@ -386,6 +386,9 @@ window.fetch = async function(url, opts){
   }
   return reply({error:'404'}, false);
 };
+// Use Flask/SQLite as the single source of truth. The mock above is kept only as
+// legacy demo data and must never intercept real application requests.
+window.fetch = nativeFetch;
 
 const $ = s => document.querySelector(s);
 let S = null, txnType = 'expense', charts = [];
@@ -449,6 +452,9 @@ function render(){
   if(!S) return;
   charts.forEach(c => c.destroy()); charts = [];
   $('#pageTitle').textContent = 'Overview';
+  const [periodYear, periodMonth] = S.period.split('-').map(Number);
+  $('#pageSub').textContent = new Date(periodYear, periodMonth - 1, 1)
+    .toLocaleDateString('vi-VN', {month:'long', year:'numeric'}) + ' · Tất cả tài khoản đã đồng bộ';
   $('#uname').textContent = S.user.name;
   $('#uplan').textContent = S.user.plan;
   $('#avatar').textContent = S.user.initials;
@@ -609,11 +615,30 @@ function setupReceiptUpload(){
       previewBox.style.display = 'flex';
       
       // Auto-fill giả lập bằng AI đồng bộ với các trang khác
-      if(!$('#fMerchant').value) $('#fMerchant').value = "Highlands Coffee";
-      if(!$('#fAmount').value) $('#fAmount').value = 45000;
-      updatePreview();
+      scanReceipt(file);
     };
     reader.readAsDataURL(file);
+  }
+
+  async function scanReceipt(file){
+    $('#err').textContent = 'Đang đọc hóa đơn bằng AI...';
+    const formData = new FormData();
+    formData.append('receipt', file);
+    try {
+      const response = await nativeFetch('/api/scan-receipt', {method:'POST', body:formData});
+      const data = await response.json();
+      if(!response.ok) throw new Error(data.error || 'Không thể đọc hóa đơn');
+      $('#fMerchant').value = data.merchant || '';
+      $('#fAmount').value = data.amount || '';
+      $('#fDate').value = data.date || $('#fDate').value;
+      setType('expense');
+      const category = S.categories.find(c => c.name === data.category);
+      if(category) $('#fCat').value = category.id;
+      $('#err').textContent = 'Đã điền thông tin từ hóa đơn. Vui lòng kiểm tra trước khi lưu.';
+      updatePreview();
+    } catch(error) {
+      $('#err').textContent = error.message;
+    }
   }
 
   function clearReceipt(){
@@ -670,8 +695,7 @@ $('#saveBtn').onclick = async () => {
     category_id: catId,
     account_id: accId,
     category: catObj ? catObj.name : 'Other',
-    account: accObj ? accObj.name : 'Personal Wallet',
-    image: currentReceiptBase64
+    account: accObj ? accObj.name : 'Personal Wallet'
   };
 
   try {
